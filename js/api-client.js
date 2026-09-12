@@ -107,6 +107,13 @@ async function sendApiRequest() {
     const headers = readRows(headersEditor, "[data-header-key]", "[data-header-value]");
     const queryParams = readRows(queryEditor, "[data-query-key]", "[data-query-value]");
 
+    if (!navigator.onLine) {
+        showStatus("You're offline — check your connection", "error");
+        return;
+    }
+
+    let slowRequestTimer = null;
+
     try {
         const requestUrl = buildRequestUrl(apiUrl.value, queryParams);
         const requestHeaders = buildHeaders(headers);
@@ -128,7 +135,12 @@ async function sendApiRequest() {
         }
 
         showStatus("Sending API request...", "warning");
+        slowRequestTimer = setTimeout(() => {
+            showStatus("Still waiting for a response...", "warning");
+        }, 5000);
+
         const response = await fetch(requestUrl, options);
+        clearTimeout(slowRequestTimer);
         const responseData = await parseApiResponse(response);
         responseData.time = Math.round(performance.now() - startedAt);
         lastApiResponse = responseData;
@@ -149,6 +161,13 @@ async function sendApiRequest() {
 
         showStatus(`Request completed with status ${response.status}.`, response.ok ? "success" : "warning");
     } catch (error) {
+        clearTimeout(slowRequestTimer);
+
+        if (!navigator.onLine) {
+            showStatus("You're offline — check your connection", "error");
+            return;
+        }
+
         responsePretty.textContent = error.message;
         responseRaw.textContent = error.stack || error.message;
         showStatus(`Request failed: ${error.message}`, "error");
