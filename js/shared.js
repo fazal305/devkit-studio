@@ -2,202 +2,202 @@
  * Escapes HTML-sensitive characters before generated markup is inserted.
  */
 function escapeHtml(str) {
-    return String(str ?? "")
-        .replaceAll("&", "&amp;")
-        .replaceAll("<", "&lt;")
-        .replaceAll(">", "&gt;")
-        .replaceAll('"', "&quot;")
-        .replaceAll("'", "&#039;");
+  return String(str ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
 }
 
 /**
  * Shows a global status message when the current page has a status element.
  */
 function showStatus(message, type = "info") {
-    const globalStatus = document.getElementById("globalStatus");
+  const globalStatus = document.getElementById("globalStatus");
 
-    if (!globalStatus) {
-        return;
-    }
+  if (!globalStatus) {
+    return;
+  }
 
-    globalStatus.textContent = message;
-    globalStatus.className = `status-message ${type}`;
+  globalStatus.textContent = message;
+  globalStatus.className = `status-message ${type}`;
 }
 
 /**
  * Copies text to the clipboard and reports the result.
  */
 async function copyText(text, successMessage = "Copied to clipboard.") {
-    if (!text) {
-        showStatus("Nothing to copy yet.", "warning");
-        return;
-    }
+  if (!text) {
+    showStatus("Nothing to copy yet.", "warning");
+    return;
+  }
 
-    try {
-        await navigator.clipboard.writeText(text);
-        showStatus(successMessage, "success");
-    } catch (error) {
-        showStatus("Clipboard access failed. Select and copy manually.", "error");
-    }
+  try {
+    await navigator.clipboard.writeText(text);
+    showStatus(successMessage, "success");
+  } catch (error) {
+    showStatus("Clipboard access failed. Select and copy manually.", "error");
+  }
 }
 
 /**
  * Downloads text content using a Blob object URL.
  */
 function downloadText(filename, content, mimeType = "text/plain") {
-    const blob = new Blob([content], { type: mimeType });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
+  const blob = new Blob([content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
 
-    link.href = url;
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    URL.revokeObjectURL(url);
-    showStatus(`${filename} downloaded.`, "success");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+  showStatus(`${filename} downloaded.`, "success");
 }
 
 /**
  * Formats a byte count into a readable unit.
  */
 function formatBytes(bytes) {
-    if (!Number.isFinite(bytes)) {
-        return "0 B";
-    }
+  if (!Number.isFinite(bytes)) {
+    return "0 B";
+  }
 
-    const units = ["B", "KB", "MB", "GB"];
-    let value = bytes;
-    let unitIndex = 0;
+  const units = ["B", "KB", "MB", "GB"];
+  let value = bytes;
+  let unitIndex = 0;
 
-    while (value >= 1024 && unitIndex < units.length - 1) {
-        value /= 1024;
-        unitIndex += 1;
-    }
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024;
+    unitIndex += 1;
+  }
 
-    return `${value.toFixed(unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
+  return `${value.toFixed(unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
 }
 
 /**
  * Formats a JavaScript value as indented JSON.
  */
 function formatJson(value) {
-    return JSON.stringify(value, null, 2);
+  return JSON.stringify(value, null, 2);
 }
 
 /**
  * Parses JSON text and returns a success wrapper.
  */
 function parseJson(text) {
-    try {
-        return { ok: true, value: JSON.parse(text) };
-    } catch (error) {
-        return { ok: false, error };
-    }
+  try {
+    return { ok: true, value: JSON.parse(text) };
+  } catch (error) {
+    return { ok: false, error };
+  }
 }
 
 /**
  * Parses XML text and detects parser errors.
  */
 function parseXml(text) {
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(text, "application/xml");
-    const parserError = doc.querySelector("parsererror");
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(text, "application/xml");
+  const parserError = doc.querySelector("parsererror");
 
-    if (parserError) {
-        return { ok: false, error: new Error(parserError.textContent.trim()) };
-    }
+  if (parserError) {
+    return { ok: false, error: new Error(parserError.textContent.trim()) };
+  }
 
-    return { ok: true, value: doc };
+  return { ok: true, value: doc };
 }
 
 /**
  * Serializes an XML document or node to text.
  */
 function serializeXml(xmlDoc) {
-    return new XMLSerializer().serializeToString(xmlDoc);
+  return new XMLSerializer().serializeToString(xmlDoc);
 }
 
 /**
  * Gets a JSON-friendly type label for a value.
  */
 function getValueType(value) {
-    if (Array.isArray(value)) {
-        return "array";
-    }
+  if (Array.isArray(value)) {
+    return "array";
+  }
 
-    if (value === null) {
-        return "null";
-    }
+  if (value === null) {
+    return "null";
+  }
 
-    return typeof value;
+  return typeof value;
 }
 
 /**
  * Clones JSON-compatible data safely.
  */
 function safeClone(value) {
-    return JSON.parse(JSON.stringify(value));
+  return JSON.parse(JSON.stringify(value));
 }
 
 /**
  * Loads persisted data from localStorage.
  */
 function loadStorageData(key, fallback) {
-    const saved = localStorage.getItem(key);
+  const saved = localStorage.getItem(key);
 
-    if (!saved) {
-        return fallback;
-    }
+  if (!saved) {
+    return fallback;
+  }
 
-    const parsed = parseJson(saved);
+  const parsed = parseJson(saved);
 
-    if (!parsed.ok) {
-        showStatus(`Saved data for ${key} could not be loaded.`, "warning");
-        return fallback;
-    }
+  if (!parsed.ok) {
+    showStatus(`Saved data for ${key} could not be loaded.`, "warning");
+    return fallback;
+  }
 
-    return parsed.value;
+  return parsed.value;
 }
 
 /**
  * Saves persistent data to localStorage.
  */
 function saveStorageData(key, value) {
-    localStorage.setItem(key, JSON.stringify(value));
+  localStorage.setItem(key, JSON.stringify(value));
 }
 
 /**
  * Highlights the active sidebar navigation link based on body data-page.
  */
 function setActiveNav() {
-    const currentPage = document.body.dataset.page;
-    const links = document.querySelectorAll("[data-page-link]");
+  const currentPage = document.body.dataset.page;
+  const links = document.querySelectorAll("[data-page-link]");
 
-    links.forEach((link) => {
-        link.classList.toggle("active", link.dataset.pageLink === currentPage);
-    });
+  links.forEach((link) => {
+    link.classList.toggle("active", link.dataset.pageLink === currentPage);
+  });
 }
 
 /**
  * Returns consistent empty-state markup.
  */
 function renderEmptyState(message) {
-    return `<div class="empty-state">${escapeHtml(message)}</div>`;
+  return `<div class="empty-state">${escapeHtml(message)}</div>`;
 }
 
 /**
  * Creates a small stats pill.
  */
 function createStatPill(label, value) {
-    return `<span class="stat-pill">${escapeHtml(label)}: ${escapeHtml(value)}</span>`;
+  return `<span class="stat-pill">${escapeHtml(label)}: ${escapeHtml(value)}</span>`;
 }
 
 /**
  * Returns the shared DevKit navigation markup for reference when building pages.
  */
 function getDevKitSidebar() {
-    return `
+  return `
     <aside class="sidebar">
       <a class="brand" href="index.html" aria-label="DevKit Studio dashboard">
         <div class="brand-mark">DS</div>
@@ -231,7 +231,7 @@ function getDevKitSidebar() {
  * Initializes shared page behavior.
  */
 function initializeSharedPage() {
-    setActiveNav();
+  setActiveNav();
 }
 
 document.addEventListener("DOMContentLoaded", initializeSharedPage);
