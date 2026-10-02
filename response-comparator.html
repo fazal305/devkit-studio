@@ -166,6 +166,48 @@
               >
                 Download Diff JSON
               </button>
+              <button
+                class="btn btn-ghost"
+                type="button"
+                id="downloadDiffTextBtn"
+              >
+                Download Text Report
+              </button>
+            </div>
+
+            <div class="toolbar">
+              <div class="form-check form-check-inline">
+                <input
+                  class="form-check-input"
+                  type="checkbox"
+                  id="showUnchangedToggle"
+                />
+                <label class="form-check-label" for="showUnchangedToggle"
+                  >Show unchanged fields</label
+                >
+              </div>
+              <div class="form-check form-check-inline">
+                <input
+                  class="form-check-input"
+                  type="checkbox"
+                  id="caseSensitiveToggle"
+                  checked
+                />
+                <label class="form-check-label" for="caseSensitiveToggle"
+                  >Case sensitive strings</label
+                >
+              </div>
+              <div class="form-check form-check-inline">
+                <input
+                  class="form-check-input"
+                  type="checkbox"
+                  id="compareArrayOrderToggle"
+                  checked
+                />
+                <label class="form-check-label" for="compareArrayOrderToggle"
+                  >Compare array order</label
+                >
+              </div>
             </div>
 
             <label class="form-label" for="originalResponseInput"
@@ -205,6 +247,16 @@
               <span class="stat-pill">Changed: 0</span>
               <span class="stat-pill">Unchanged: 0</span>
             </div>
+
+            <label class="form-label" for="diffFilterInput"
+              >Filter Differences</label
+            >
+            <input
+              class="form-control mb-3"
+              id="diffFilterInput"
+              type="text"
+              placeholder="Filter by path, type, or value..."
+            />
 
             <div id="diffResultsOutput">
               <div class="empty-state">
