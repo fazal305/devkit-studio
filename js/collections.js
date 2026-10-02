@@ -4,6 +4,9 @@ const collectionRequestsOutput = document.getElementById(
   "collectionRequestsOutput",
 );
 const collectionStats = document.getElementById("collectionStats");
+const searchSavedRequestsInput = document.getElementById(
+  "searchSavedRequests",
+);
 
 const collectionsKey = "devkitStudio.collections";
 const requestDraftKey = "devkitStudio.requestDraft";
@@ -100,9 +103,17 @@ function saveRequestToCollection(request) {
 }
 
 /**
- * Renders requests for the active collection.
+ * Renders requests for the active collection, or a cross-collection search
+ * result set when a search term is present (ported from postman-lite).
  */
 function renderCollectionRequests() {
+  const term = (searchSavedRequestsInput?.value || "").trim();
+
+  if (term) {
+    renderSearchedSavedRequests(term);
+    return;
+  }
+
   const collections = loadStorageData(collectionsKey, []);
   const collection = collections.find((item) => item.id === activeCollectionId);
 
@@ -114,20 +125,64 @@ function renderCollectionRequests() {
   }
 
   collectionRequestsOutput.innerHTML = collection.requests
-    .map(
-      (request) => `
+    .map((request) => renderSavedRequestCard(request, collection.name))
+    .join("");
+}
+
+/**
+ * Searches saved requests across every collection by name, method, URL, or
+ * collection name (feature ported from fazal305/postman-lite).
+ */
+function renderSearchedSavedRequests(term) {
+  const collections = loadStorageData(collectionsKey, []);
+  const normalizedTerm = term.toLowerCase();
+
+  const matches = collections.flatMap((collection) =>
+    collection.requests
+      .filter((request) => {
+        const haystack = [
+          request.name || "",
+          request.method,
+          request.url,
+          collection.name,
+        ]
+          .join(" ")
+          .toLowerCase();
+
+        return haystack.includes(normalizedTerm);
+      })
+      .map((request) => ({ request, collectionName: collection.name })),
+  );
+
+  if (!matches.length) {
+    collectionRequestsOutput.innerHTML = renderEmptyState(
+      "No saved requests match your search.",
+    );
+    return;
+  }
+
+  collectionRequestsOutput.innerHTML = matches
+    .map(({ request, collectionName }) =>
+      renderSavedRequestCard(request, collectionName),
+    )
+    .join("");
+}
+
+/**
+ * Renders one saved-request card, optionally labeled with its collection name.
+ */
+function renderSavedRequestCard(request, collectionName) {
+  return `
     <article class="history-item">
       <span class="method-badge ${escapeHtml(request.method.toLowerCase())}">${escapeHtml(request.method)}</span>
       <h4 class="mt-2">${escapeHtml(request.url)}</h4>
-      <p class="item-meta">${escapeHtml(new Date(request.createdAt).toLocaleString())}</p>
+      <p class="item-meta">${escapeHtml(collectionName || "Unassigned")} | ${escapeHtml(new Date(request.createdAt).toLocaleString())}</p>
       <div class="item-actions">
         <button class="btn btn-sm btn-ghost" type="button" data-load-collection-request="${escapeHtml(request.id)}">Load Request</button>
         <button class="btn btn-sm btn-ghost" type="button" data-delete-collection-request="${escapeHtml(request.id)}">Delete</button>
       </div>
     </article>
-  `,
-    )
-    .join("");
+  `;
 }
 
 /**
@@ -195,6 +250,10 @@ function bindCollectionsEvents() {
   document
     .getElementById("exportCollectionsBtn")
     .addEventListener("click", exportCollections);
+
+  searchSavedRequestsInput.addEventListener("input", () => {
+    renderCollectionRequests();
+  });
 
   collectionsListOutput.addEventListener("click", (event) => {
     const button = event.target.closest("[data-select-collection]");
