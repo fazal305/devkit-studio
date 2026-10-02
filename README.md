@@ -37,18 +37,26 @@ The project is designed as a flagship portfolio application: it demonstrates str
 - Multi-page browser application architecture
 - Shared cyberpunk developer workspace UI
 - Sticky responsive sidebar navigation
-- JSON validation, formatting, minifying, and tree rendering
-- XML validation, formatting, and tree rendering
+- JSON validation, formatting, minifying, and collapsible tree rendering
+  with live search, match highlighting, and file import
+- XML validation, formatting, and collapsible tree rendering with live
+  search, match highlighting, and file import
 - RSS feed parsing, searching, and JSON export
 - API request sending with methods, headers, query parameters, and JSON bodies
 - API response status, timing, size, and content-type stats
 - Request history persisted in localStorage
-- Request collections persisted in localStorage
+- Request collections persisted in localStorage, with search across every
+  saved request by name, method, URL, or collection
 - Environment variables with `{{variable}}` replacement support
-- Recursive JSON response comparison
-- Recursive JSON Schema generation
+- Recursive JSON response comparison with case-sensitivity, array-order,
+  and show-unchanged options, a live diff filter, and text report export
+- Configurable recursive JSON Schema generation (required fields, examples,
+  descriptions, nullable detection, strict array items), file import, and
+  searchable field analysis with stats
 - JSON to XML and XML to JSON conversion
-- OpenAPI-style endpoint viewer and documentation export
+- OpenAPI/Swagger endpoint viewer with JSON and YAML spec support, file
+  import, $ref-resolved schema trees, method/tag filtering, a live GET
+  request tester, and Markdown/JSON documentation export
 - Mock JSON response templates
 - Copy-to-clipboard actions
 - Download/export actions through Blob URLs
