@@ -171,6 +171,9 @@
               </button>
             </div>
 
+            <label class="form-label" for="jsonFileInput">Import JSON File</label>
+            <input class="form-control mb-3" id="jsonFileInput" type="file" accept=".json,.txt" />
+
             <textarea
               class="code-input form-control"
               id="jsonInput"
@@ -192,6 +195,15 @@
             <div class="pill-row mb-3" id="jsonStats">
               <span class="stat-pill">Valid: Waiting</span>
             </div>
+
+            <input
+              class="form-control search-row"
+              id="jsonTreeSearch"
+              type="search"
+              placeholder="Search keys and values"
+              disabled
+            />
+            <p class="item-meta" id="jsonTreeMatchCount">0 matches</p>
 
             <div class="preview-panel" id="jsonTreeOutput">
               <div class="empty-state">

@@ -168,6 +168,9 @@
               </button>
             </div>
 
+            <label class="form-label" for="xmlFileInput">Import XML File</label>
+            <input class="form-control mb-3" id="xmlFileInput" type="file" accept=".xml,.txt" />
+
             <textarea
               class="code-input form-control"
               id="xmlInput"
@@ -189,6 +192,15 @@
             <div class="pill-row mb-3" id="xmlStats">
               <span class="stat-pill">Valid: Waiting</span>
             </div>
+
+            <input
+              class="form-control search-row"
+              id="xmlTreeSearch"
+              type="search"
+              placeholder="Search tags, attributes, and text"
+              disabled
+            />
+            <p class="item-meta" id="xmlTreeMatchCount">0 matches</p>
 
             <div class="preview-panel" id="xmlTreeOutput">
               <div class="empty-state">

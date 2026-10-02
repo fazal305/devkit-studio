@@ -1,6 +1,11 @@
 const xmlInput = document.getElementById("xmlInput");
+const xmlFileInput = document.getElementById("xmlFileInput");
 const xmlTreeOutput = document.getElementById("xmlTreeOutput");
 const xmlStats = document.getElementById("xmlStats");
+const xmlTreeSearch = document.getElementById("xmlTreeSearch");
+const xmlTreeMatchCount = document.getElementById("xmlTreeMatchCount");
+
+let xmlExplorerDocState = null;
 
 /**
  * Validates XML input, updates stats, and renders the XML tree.
@@ -11,24 +16,126 @@ function validateXmlExplorer() {
   if (!parsed.ok) {
     xmlStats.innerHTML = createStatPill("Valid", "No");
     xmlTreeOutput.innerHTML = renderEmptyState(parsed.error.message);
+    xmlExplorerDocState = null;
+    xmlTreeSearch.disabled = true;
+    xmlTreeSearch.value = "";
+    xmlTreeMatchCount.textContent = "0 matches";
     showStatus("XML validation failed.", "error");
     return null;
   }
 
-  xmlTreeOutput.innerHTML = "";
-  const tree = document.createElement("ul");
-  tree.className = "tree-list";
-  renderXmlTree(parsed.value.documentElement, tree);
-  xmlTreeOutput.appendChild(tree);
+  xmlExplorerDocState = parsed.value;
+  xmlTreeSearch.disabled = false;
+  renderXmlExplorerTree();
 
+  // Element/attribute/depth counts ported from fazal305/dataforge's stats bar.
   xmlStats.innerHTML = [
     createStatPill("Valid", "Yes"),
     createStatPill("Root", parsed.value.documentElement.nodeName),
+    createStatPill("Tags", countXmlElements(parsed.value)),
+    createStatPill("Max Depth", getXmlMaxDepth(parsed.value.documentElement, 1)),
+    createStatPill("Attributes", countXmlAttributes(parsed.value)),
     createStatPill("Size", formatBytes(new Blob([xmlInput.value]).size)),
   ].join("");
 
   showStatus("XML is valid.", "success");
   return parsed.value;
+}
+
+/**
+ * Re-renders the tree using the current search term and updates the match
+ * count (search/highlight ported from fazal305/dataforge).
+ */
+function renderXmlExplorerTree() {
+  if (!xmlExplorerDocState) {
+    return;
+  }
+
+  const term = xmlTreeSearch.value.trim();
+  xmlTreeOutput.innerHTML = "";
+  const tree = document.createElement("ul");
+  tree.className = "tree-list";
+  renderXmlTree(xmlExplorerDocState.documentElement, tree, term);
+  xmlTreeOutput.appendChild(tree);
+
+  const matches = term
+    ? countXmlMatches(xmlExplorerDocState.documentElement, term.toLowerCase())
+    : 0;
+  xmlTreeMatchCount.textContent = `${matches} ${matches === 1 ? "match" : "matches"}`;
+}
+
+/**
+ * Counts XML element nodes (ported from fazal305/dataforge).
+ */
+function countXmlElements(xmlDoc) {
+  return xmlDoc.getElementsByTagName("*").length;
+}
+
+/**
+ * Counts XML attributes across all elements (ported from fazal305/dataforge).
+ */
+function countXmlAttributes(xmlDoc) {
+  return Array.from(xmlDoc.getElementsByTagName("*")).reduce(
+    (total, element) => total + element.attributes.length,
+    0,
+  );
+}
+
+/**
+ * Finds the maximum XML element depth (ported from fazal305/dataforge).
+ */
+function getXmlMaxDepth(node, depth = 1) {
+  const children = Array.from(node.children);
+
+  if (!children.length) {
+    return depth;
+  }
+
+  return Math.max(...children.map((child) => getXmlMaxDepth(child, depth + 1)));
+}
+
+/**
+ * Counts how many times a search term appears across tag names,
+ * attributes, and text (ported from fazal305/dataforge).
+ */
+function countXmlMatches(node, needle) {
+  let total = node.nodeName.toLowerCase().includes(needle) ? 1 : 0;
+
+  Array.from(node.attributes || []).forEach((attribute) => {
+    if (attribute.name.toLowerCase().includes(needle)) total += 1;
+    if (attribute.value.toLowerCase().includes(needle)) total += 1;
+  });
+
+  Array.from(node.childNodes).forEach((child) => {
+    if (child.nodeType === Node.ELEMENT_NODE) {
+      total += countXmlMatches(child, needle);
+    } else if (
+      child.nodeType === Node.TEXT_NODE &&
+      child.textContent.trim().toLowerCase().includes(needle)
+    ) {
+      total += 1;
+    }
+  });
+
+  return total;
+}
+
+/**
+ * Wraps search term matches in a <mark> highlight
+ * (ported from fazal305/dataforge).
+ */
+function highlightXmlMatch(text, term) {
+  const escaped = escapeHtml(String(text));
+
+  if (!term) {
+    return escaped;
+  }
+
+  const escapedTerm = escapeHtml(term).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return escaped.replace(
+    new RegExp(`(${escapedTerm})`, "gi"),
+    '<mark class="highlight">$1</mark>',
+  );
 }
 
 /**
@@ -83,16 +190,53 @@ function prettyFormatXml(node, depth = 0) {
 /**
  * Recursively renders XML nodes as a tree.
  */
-function renderXmlTree(xmlNode, container) {
+function renderXmlTree(xmlNode, container, searchTerm = "") {
   const item = document.createElement("li");
   const attributes = Array.from(xmlNode.attributes || [])
     .map((attribute) => `${attribute.name}="${attribute.value}"`)
     .join(" ");
 
-  item.innerHTML = `<span class="tree-key">${escapeHtml(xmlNode.nodeName)}</span>`;
+  const childElements = Array.from(xmlNode.children);
+
+  if (childElements.length) {
+    // Collapsible toggle button ported from fazal305/dataforge's tree.
+    const toggle = document.createElement("button");
+    toggle.type = "button";
+    toggle.className = "btn btn-sm btn-ghost tree-toggle";
+    toggle.textContent = "-";
+    toggle.setAttribute("aria-label", `Toggle ${xmlNode.nodeName}`);
+    item.appendChild(toggle);
+
+    const nested = document.createElement("ul");
+    toggle.addEventListener("click", () => {
+      const collapsed = nested.classList.toggle("d-none");
+      toggle.textContent = collapsed ? "+" : "-";
+    });
+
+    const label = document.createElement("span");
+    label.innerHTML = buildXmlNodeLabel(xmlNode, attributes, searchTerm);
+    item.appendChild(label);
+
+    childElements.forEach((child) =>
+      renderXmlTree(child, nested, searchTerm),
+    );
+    item.appendChild(nested);
+  } else {
+    item.innerHTML = buildXmlNodeLabel(xmlNode, attributes, searchTerm);
+  }
+
+  container.appendChild(item);
+}
+
+/**
+ * Builds the label markup for one XML tree node, including attributes and
+ * direct text content with search highlighting.
+ */
+function buildXmlNodeLabel(xmlNode, attributes, searchTerm) {
+  let html = `<span class="tree-key">${highlightXmlMatch(xmlNode.nodeName, searchTerm)}</span>`;
 
   if (attributes) {
-    item.innerHTML += ` <span class="tree-type">${escapeHtml(attributes)}</span>`;
+    html += ` <span class="tree-type">${highlightXmlMatch(attributes, searchTerm)}</span>`;
   }
 
   const text = Array.from(xmlNode.childNodes)
@@ -102,18 +246,10 @@ function renderXmlTree(xmlNode, container) {
     .join(" ");
 
   if (text) {
-    item.innerHTML += `: <span class="tree-value">${escapeHtml(text)}</span>`;
+    html += `: <span class="tree-value">${highlightXmlMatch(text, searchTerm)}</span>`;
   }
 
-  const childElements = Array.from(xmlNode.children);
-
-  if (childElements.length) {
-    const nested = document.createElement("ul");
-    childElements.forEach((child) => renderXmlTree(child, nested));
-    item.appendChild(nested);
-  }
-
-  container.appendChild(item);
+  return html;
 }
 
 /**
@@ -156,6 +292,22 @@ function downloadXmlExplorerOutput() {
 }
 
 /**
+ * Imports a local XML/text file into the editor
+ * (ported from fazal305/dataforge).
+ */
+async function handleXmlExplorerFileImport(event) {
+  const file = event.target.files[0];
+
+  if (!file) {
+    return;
+  }
+
+  xmlInput.value = await file.text();
+  validateXmlExplorer();
+  xmlFileInput.value = "";
+}
+
+/**
  * Binds XML Explorer UI events.
  */
 function bindXmlExplorerEvents() {
@@ -168,6 +320,8 @@ function bindXmlExplorerEvents() {
   document
     .getElementById("loadXmlSampleBtn")
     .addEventListener("click", loadXmlExplorerSample);
+  xmlFileInput.addEventListener("change", handleXmlExplorerFileImport);
+  xmlTreeSearch.addEventListener("input", renderXmlExplorerTree);
   document
     .getElementById("copyXmlBtn")
     .addEventListener("click", copyXmlExplorerOutput);
