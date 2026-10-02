@@ -1,6 +1,11 @@
 const jsonInput = document.getElementById("jsonInput");
+const jsonFileInput = document.getElementById("jsonFileInput");
 const jsonTreeOutput = document.getElementById("jsonTreeOutput");
 const jsonStats = document.getElementById("jsonStats");
+const jsonTreeSearch = document.getElementById("jsonTreeSearch");
+const jsonTreeMatchCount = document.getElementById("jsonTreeMatchCount");
+
+let jsonExplorerDataState = null;
 
 /**
  * Validates JSON input, updates stats, and renders the tree.
@@ -11,25 +16,161 @@ function validateJsonExplorer() {
   if (!parsed.ok) {
     jsonStats.innerHTML = createStatPill("Valid", "No");
     jsonTreeOutput.innerHTML = renderEmptyState(parsed.error.message);
+    jsonExplorerDataState = null;
+    jsonTreeSearch.disabled = true;
+    jsonTreeSearch.value = "";
+    jsonTreeMatchCount.textContent = "0 matches";
     showStatus("JSON validation failed.", "error");
     return null;
   }
 
-  jsonTreeOutput.innerHTML = "";
-  const tree = document.createElement("ul");
-  tree.className = "tree-list";
-  renderJsonTree(parsed.value, tree, "$");
-  jsonTreeOutput.appendChild(tree);
+  jsonExplorerDataState = parsed.value;
+  jsonTreeSearch.disabled = false;
+  renderJsonExplorerTree();
 
   const formatted = formatJson(parsed.value);
+  // Depth/key/array counts ported from fazal305/dataforge's stats bar.
   jsonStats.innerHTML = [
     createStatPill("Valid", "Yes"),
     createStatPill("Type", getValueType(parsed.value)),
+    createStatPill("Keys", countJsonKeys(parsed.value)),
+    createStatPill("Max Depth", getJsonMaxDepth(parsed.value, 1)),
+    createStatPill("Arrays", countJsonArrays(parsed.value)),
     createStatPill("Size", formatBytes(new Blob([formatted]).size)),
   ].join("");
 
   showStatus("JSON is valid.", "success");
   return parsed.value;
+}
+
+/**
+ * Re-renders the tree using the current search term and updates the match
+ * count (search/highlight ported from fazal305/dataforge).
+ */
+function renderJsonExplorerTree() {
+  if (jsonExplorerDataState === null) {
+    return;
+  }
+
+  const term = jsonTreeSearch.value.trim();
+  jsonTreeOutput.innerHTML = "";
+  const tree = document.createElement("ul");
+  tree.className = "tree-list";
+  renderJsonTree(jsonExplorerDataState, tree, "$", term);
+  jsonTreeOutput.appendChild(tree);
+
+  const matches = term
+    ? countJsonMatches(jsonExplorerDataState, term.toLowerCase())
+    : 0;
+  jsonTreeMatchCount.textContent = `${matches} ${matches === 1 ? "match" : "matches"}`;
+}
+
+/**
+ * Counts keys recursively in JSON data (ported from fazal305/dataforge).
+ */
+function countJsonKeys(value) {
+  const type = getValueType(value);
+
+  if (type === "array") {
+    return value.reduce((total, item) => total + countJsonKeys(item), 0);
+  }
+
+  if (type === "object") {
+    return Object.entries(value).reduce(
+      (total, [, child]) => total + 1 + countJsonKeys(child),
+      0,
+    );
+  }
+
+  return 0;
+}
+
+/**
+ * Counts arrays recursively in JSON data (ported from fazal305/dataforge).
+ */
+function countJsonArrays(value) {
+  const type = getValueType(value);
+
+  if (type === "array") {
+    return (
+      1 + value.reduce((total, item) => total + countJsonArrays(item), 0)
+    );
+  }
+
+  if (type === "object") {
+    return Object.values(value).reduce(
+      (total, child) => total + countJsonArrays(child),
+      0,
+    );
+  }
+
+  return 0;
+}
+
+/**
+ * Finds the maximum nesting depth in JSON data
+ * (ported from fazal305/dataforge).
+ */
+function getJsonMaxDepth(value, depth = 1) {
+  const type = getValueType(value);
+
+  if (type !== "object" && type !== "array") {
+    return depth;
+  }
+
+  const values = type === "array" ? value : Object.values(value);
+
+  if (!values.length) {
+    return depth;
+  }
+
+  return Math.max(...values.map((child) => getJsonMaxDepth(child, depth + 1)));
+}
+
+/**
+ * Counts how many times a search term appears across keys and values
+ * (ported from fazal305/dataforge).
+ */
+function countJsonMatches(value, needle, key = "") {
+  let total = 0;
+
+  if (key && key.toLowerCase().includes(needle)) {
+    total += 1;
+  }
+
+  const type = getValueType(value);
+
+  if (type === "array") {
+    value.forEach((item, index) => {
+      total += countJsonMatches(item, needle, `[${index}]`);
+    });
+  } else if (type === "object") {
+    Object.entries(value).forEach(([childKey, childValue]) => {
+      total += countJsonMatches(childValue, needle, childKey);
+    });
+  } else if (String(value).toLowerCase().includes(needle)) {
+    total += 1;
+  }
+
+  return total;
+}
+
+/**
+ * Wraps search term matches in a <mark> highlight
+ * (ported from fazal305/dataforge).
+ */
+function highlightJsonMatch(text, term) {
+  const escaped = escapeHtml(String(text));
+
+  if (!term) {
+    return escaped;
+  }
+
+  const escapedTerm = escapeHtml(term).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return escaped.replace(
+    new RegExp(`(${escapedTerm})`, "gi"),
+    '<mark class="highlight">$1</mark>',
+  );
 }
 
 /**
@@ -63,21 +204,38 @@ function minifyJsonExplorer() {
 /**
  * Recursively renders a JSON value as a key/value tree.
  */
-function renderJsonTree(value, container, path = "$") {
+function renderJsonTree(value, container, path = "$", searchTerm = "") {
   const type = getValueType(value);
   const item = document.createElement("li");
 
   if (type === "object" || type === "array") {
-    item.innerHTML = `<span class="tree-key">${escapeHtml(path)}</span> <span class="tree-type">${type}</span>`;
+    // Collapsible toggle button ported from fazal305/dataforge's tree.
+    const toggle = document.createElement("button");
+    toggle.type = "button";
+    toggle.className = "btn btn-sm btn-ghost tree-toggle";
+    toggle.textContent = "-";
+    toggle.setAttribute("aria-label", `Toggle ${path}`);
+
+    const label = document.createElement("span");
+    label.innerHTML = `<span class="tree-key">${highlightJsonMatch(path, searchTerm)}</span> <span class="tree-type">${type}</span>`;
+
+    item.appendChild(toggle);
+    item.appendChild(label);
+
     const nested = document.createElement("ul");
 
     Object.entries(value).forEach(([key, childValue]) => {
-      renderJsonTree(childValue, nested, key);
+      renderJsonTree(childValue, nested, key, searchTerm);
+    });
+
+    toggle.addEventListener("click", () => {
+      const collapsed = nested.classList.toggle("d-none");
+      toggle.textContent = collapsed ? "+" : "-";
     });
 
     item.appendChild(nested);
   } else {
-    item.innerHTML = `<span class="tree-key">${escapeHtml(path)}</span>: <span class="tree-value">${escapeHtml(JSON.stringify(value))}</span> <span class="tree-type">${type}</span>`;
+    item.innerHTML = `<span class="tree-key">${highlightJsonMatch(path, searchTerm)}</span>: <span class="tree-value">${highlightJsonMatch(JSON.stringify(value), searchTerm)}</span> <span class="tree-type">${type}</span>`;
   }
 
   container.appendChild(item);
@@ -140,6 +298,22 @@ function downloadJsonExplorerOutput() {
 }
 
 /**
+ * Imports a local JSON/text file into the editor
+ * (ported from fazal305/dataforge).
+ */
+async function handleJsonExplorerFileImport(event) {
+  const file = event.target.files[0];
+
+  if (!file) {
+    return;
+  }
+
+  jsonInput.value = await file.text();
+  validateJsonExplorer();
+  jsonFileInput.value = "";
+}
+
+/**
  * Binds JSON Explorer UI events.
  */
 function bindJsonExplorerEvents() {
@@ -161,6 +335,8 @@ function bindJsonExplorerEvents() {
   document
     .getElementById("downloadJsonBtn")
     .addEventListener("click", downloadJsonExplorerOutput);
+  jsonFileInput.addEventListener("change", handleJsonExplorerFileImport);
+  jsonTreeSearch.addEventListener("input", renderJsonExplorerTree);
 }
 
 /**
